@@ -58,7 +58,9 @@ namespace VoiceChannelGrabber
 
             try
             {
+                #if Windows
                 Native.SetQuickEditMode(false);
+                #endif
                 MainAsync().Wait();
                 return 0;
             }
@@ -323,12 +325,35 @@ namespace VoiceChannelGrabber
             }
         }
 
+        private static void EnsureDiscordIpcSymlink(int pipeNumber = 0)
+        {
+            if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return;
+
+            string pipeName = "discord-ipc-" + pipeNumber;
+            string xdgRuntime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR")
+                ?? "/run/user/" + getuid();
+            string socketPath = Path.Combine(xdgRuntime, pipeName);
+            string symlinkPath = "/tmp/CoreFxPipe_" + pipeName;
+
+            if (File.Exists(socketPath))
+            {
+                // Remove stale symlink
+                try { File.Delete(symlinkPath); } catch { }
+                File.CreateSymbolicLink(symlinkPath, socketPath);
+                Log.Logger.Debug("Created symlink {Symlink} -> {Socket}", symlinkPath, socketPath);
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("libc")]
+        private static extern uint getuid();
+
         private static async Task WaitForDiscordClient()
         {
             while (!IsDiscordAvailable)
             {
                 try
                 {
+                    EnsureDiscordIpcSymlink();
                     await client.InitAsync();
                     IsDiscordAvailable = true;
                     Log.Logger.Information("Connected to local Discord client.");
