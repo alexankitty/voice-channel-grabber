@@ -220,9 +220,17 @@ namespace VoiceChannelGrabber
             if (IsOBSconnected) Log.Logger.Warning("Websocket connection lost. Waiting for OBS...");
             IsOBSconnected = false;
 
+            if (obs != null)
+            {
+                obs.Connected -= obsOnConnect;
+                obs.Disconnected -= obsOnDisconnect;
+                if (obs.IsConnected)
+                    try { obs.Disconnect(); } catch { }
+            }
+
+            Thread.Sleep(2000);
+
             obs = new OBSWebsocket();
-            obs.Connected -= obsOnConnect;
-            obs.Disconnected -= obsOnDisconnect;
             obs.Connected += obsOnConnect;
             obs.Disconnected += obsOnDisconnect;
             obs.ConnectAsync(Config.WebsocketAddress, Config.WebsocketPassword);
